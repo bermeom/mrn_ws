@@ -1,0 +1,250 @@
+#include "ros/ros.h"
+#include "nav_msgs/Odometry.h"
+#include "sensor_msgs/LaserScan.h"
+#include "visualization_msgs/MarkerArray.h"
+#include "geometry_msgs/PoseStamped.h"
+#include "std_msgs/ColorRGBA.h"
+#include <tf/transform_datatypes.h>
+#include <tf/transform_listener.h>
+
+
+#include <eigen3/Eigen/Core>
+#include <eigen3/Eigen/Dense>
+
+
+struct Cluster
+{
+  double x;
+  double y;
+  double width;
+  int start_index;  
+  int points;
+  double x_global;
+  double y_global;
+  
+  bool operator < (const Cluster& c) const
+    {
+        return (width > c.width);
+    }
+};
+
+struct Landmark
+{
+  double x;
+  double y;
+  double radius;
+};
+
+struct Pose
+{
+  double x;
+  double y;
+  double th;
+};
+
+class Localization
+{
+  public:
+    Localization()
+    {
+      this->laser_sub  = n.subscribe("laserscan", 1, &Localization::laser_callback, this);
+      this->odom_sub  = n.subscribe("odom", 1, &Localization::odom_callback, this);
+      this->markers_pub = n.advertise<visualization_msgs::MarkerArray>("markers", 1);
+      this->pose_pub = n.advertise<geometry_msgs::PoseStamped>("pose",1);
+      
+      this->red.r=1.0;
+      this->red.a=0.5;
+      this->green.g=1.0;
+      this->green.a=0.5;
+      this->blue.b=1.0;
+      this->blue.a=0.5;      
+      
+      //transform from odom to platform (updated on odom_callback)
+      this->pose_x =0.0; //[m]
+      this->pose_y =0.0; //[m]
+      this->pose_th=0.0; //[radians]
+      
+      //transform from platform to sensor
+      this->static_x = 0.08; //[m]
+      this->static_y = 0.00; //[m]
+      this->static_z = 0.44; //[m]//ignore. Used for displaying.
+      this->static_th= 0.0; //[radians]
+      
+      this->landmarks.resize(3);
+      //ROS_INFO("Landmarks size: %lu", this->landmarks.size());
+      //Coordinates associated to localization.world cylinders positions and sizes
+      this->landmarks[0].x     = -2.0;
+      this->landmarks[0].y     =  2.0;
+      this->landmarks[0].radius=  0.5;
+      this->landmarks[1].x     =  0.0;
+      this->landmarks[1].y     = -1.0;
+      this->landmarks[1].radius=  0.3;
+      this->landmarks[2].x     =  1.0;
+      this->landmarks[2].y     =  1.0;
+      this->landmarks[2].radius=  0.15;
+
+      this->received_scan=false;
+      this->rate=2; //HZ
+    }
+    
+    void laser_callback(const sensor_msgs::LaserScan::ConstPtr& msg)
+    {
+      this->scan_msg = *msg;
+      this->received_scan=true;
+    }
+    
+    void odom_callback(const nav_msgs::Odometry::ConstPtr& odom_msg)
+    {    
+      this->pose_x = odom_msg->pose.pose.position.x;
+      this->pose_y = odom_msg->pose.pose.position.y;
+      this->pose_th = tf::getYaw(odom_msg->pose.pose.orientation);
+    }
+    
+    std::vector<Cluster> getClusters()
+    {
+      std::vector<Cluster> clusters;
+      //TODO 1
+
+
+      
+
+      for(unsigned int i=0; i<clusters.size(); i++)
+      {
+        if(clusters[i].points > 3)
+        {
+          //ROS_INFO("cluster[%d] points,width=%d, %f", i, clusters[i].points, clusters[i].width);
+          ROS_INFO("cluster[%d] points,width=%d, %f.    x,y=%f, %f", i, clusters[i].points, clusters[i].width, clusters[i].x, clusters[i].y);
+          //ROS_INFO("cluster[%d] points,width,x_global,y_global=%d, %f, %f, %f", i, clusters[i].points, clusters[i].width, clusters[i].x_global, clusters[i].y_global);
+        }
+      }
+
+      return clusters;
+    }
+    
+    Pose compute_pose()
+    {
+      Pose p;
+      double s=0.0;
+      //TODO 2
+      
+
+
+      ROS_INFO("pose.x,pose.y= %f, %f.   pose.th, scale= %f, %f",pose.x, pose.y, pose.th, s);
+
+      return p;
+    }
+    
+    void loop()
+    {
+      if(this->received_scan)
+      {
+        this->received_scan=false;
+
+        this->clusters = this->getClusters();
+        this->publish_markers(this->clusters,"laser_link","cluster_pos",-this->static_z,this->red,this->scan_msg.header.stamp);
+
+        this->pose = this->compute_pose();
+        this->publish_pose(pose.x, pose.y, pose.th, "odom", 0.0, this->red, this->scan_msg.header.stamp );
+
+        ROS_INFO("---");
+      }
+    }
+    
+    void publish_pose(double x, double y, double th, std::string frame_id, double z, std_msgs::ColorRGBA color, ros::Time t)
+    {
+      this->pose_msg.header.stamp = t;
+      this->pose_msg.header.frame_id = frame_id;
+      this->pose_msg.pose.position.x = -x;
+      this->pose_msg.pose.position.y = -y;
+      this->pose_msg.pose.position.z = z;
+      this->pose_msg.pose.orientation = tf::createQuaternionMsgFromYaw(-th);
+      
+      this->pose_pub.publish(this->pose_msg);
+    }
+
+    void publish_markers(std::vector<Cluster> c, std::string frame_id, std::string name_space,double z, std_msgs::ColorRGBA color, ros::Time t)
+    {
+
+      //this->markers_msg.markers.resize(indexes.size());
+      this->markers_msg.markers.clear();
+      for(unsigned int i=0; i<c.size(); i++)
+      {
+        visualization_msgs::Marker marker;
+        marker.header.frame_id = frame_id;
+        marker.header.stamp    = t;
+        marker.ns              = name_space;
+        marker.id              = i;
+        //marker.id              = this->markers_msg.markers.size();
+        marker.type            = visualization_msgs::Marker::CYLINDER;
+        marker.action          = visualization_msgs::Marker::ADD;
+
+        double radius=c[i].width;
+        marker.scale.x = radius;
+        marker.scale.y = radius;
+        marker.scale.z = 1.0;
+
+        marker.pose.position.x = c[i].x;
+        marker.pose.position.y = c[i].y;
+        marker.pose.position.z = z + marker.scale.z/2.0 ;
+
+        marker.pose.orientation.x = 0.0;
+        marker.pose.orientation.y = 0.0;
+        marker.pose.orientation.z = 0.0;
+        marker.pose.orientation.w = 1.0;
+
+        //marker.color.r = 1.0;
+        //marker.color.g = 0.0;
+        //marker.color.b = 0.0;
+        //marker.color.a = 0.5;
+        marker.color=color;
+        marker.lifetime = ros::Duration(1.0/this->rate);
+
+        //only publish if not NaNs
+        if(c[i].x==c[i].x && c[i].y == c[i].y)
+        {
+          this->markers_msg.markers.push_back(marker);
+        }
+      }
+      this->markers_pub.publish(this->markers_msg);
+    }
+
+    double getRate()
+    {
+      return this->rate;
+    }
+
+  private:
+    ros::NodeHandle n;
+    double rate;
+    ros::Subscriber laser_sub;
+    sensor_msgs::LaserScan scan_msg;
+    bool received_scan;
+    ros::Subscriber odom_sub;
+    ros::Publisher markers_pub;
+    visualization_msgs::MarkerArray markers_msg;
+    ros::Publisher pose_pub;
+    geometry_msgs::PoseStamped pose_msg;
+    std_msgs::ColorRGBA red;
+    std_msgs::ColorRGBA green;
+    std_msgs::ColorRGBA blue;
+    double pose_x, pose_y, pose_th;
+    double static_x, static_y, static_z, static_th;
+    std::vector<Landmark> landmarks;
+    std::vector<Cluster> clusters;
+    Pose pose;
+    tf::TransformListener tf_listener;
+};
+
+int main(int argc, char **argv)
+{
+  ros::init(argc, argv, "localization");
+  Localization my_localization;
+  ros::Rate loop_rate(my_localization.getRate());
+  while (ros::ok())
+  {
+    my_localization.loop();
+    ros::spinOnce();
+    loop_rate.sleep();
+  }
+  return 0;
+}

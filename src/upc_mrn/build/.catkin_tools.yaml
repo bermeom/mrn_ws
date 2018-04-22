@@ -1,0 +1,6 @@
+devel_space: /home/upc/mrn_ws/src/upc_mrn/devel
+install: false
+install_space: /home/upc/mrn_ws/src/upc_mrn/install
+profile: default
+source_space: /home/upc/mrn_ws/src/upc_mrn/src
+workspace: /home/upc/mrn_ws/src/upc_mrn

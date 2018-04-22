@@ -1,0 +1,206 @@
+#include "ros/ros.h"
+#include "nav_msgs/Odometry.h"
+#include "sensor_msgs/LaserScan.h"
+#include "visualization_msgs/MarkerArray.h"
+#include "std_msgs/ColorRGBA.h"
+#include <tf/transform_datatypes.h>
+
+class LaserProcessor
+{
+  public:
+    LaserProcessor()
+    {
+      this->laser_sub  = n.subscribe("scan", 1, &LaserProcessor::laser_callback, this);
+      this->odom_sub  = n.subscribe("odom", 1, &LaserProcessor::odom_callback, this);
+      this->markers_pub = n.advertise<visualization_msgs::MarkerArray>("markers", 1);
+      
+      this->red.r=1.0;
+      this->red.a=0.5;
+      this->green.g=1.0;
+      this->green.a=0.5;
+      this->blue.b=1.0;
+      this->blue.a=0.5;      
+      
+      //transform from odom to platform (updated on odom_callback)
+      this->pose_x =0.0; //[m]
+      this->pose_y =0.0; //[m]
+      this->pose_th=0.0; //[radians]
+      
+      //transform from platform to sensor
+      this->static_x =-0.0870; //[m]
+      this->static_y = 0.0125; //[m]
+      this->static_z = 0.2972; //[m]//ignore. Used for displaying.
+      this->static_th= 0.0; //[radians]
+    }
+    
+    void laser_callback(const sensor_msgs::LaserScan::ConstPtr& laser_msg)
+    {
+      std::vector<double> x;
+      std::vector<double> y;
+      int size=laser_msg->ranges.size();
+      
+      //only take into account 3 values (first, mid, last), for visualization
+      std::vector<int> indexs;
+      indexs.push_back(0);
+      indexs.push_back((size+1)/2);
+      indexs.push_back(size-1);
+      
+      x.resize(size);
+      y.resize(size);
+      
+      ////EXAMPLES START//
+      ////Resize vector
+      //int my_size=2;
+      //x.resize(my_size);
+      //ROS_INFO("x size=%lu", x.size());
+      
+      ////Clear vector
+      //x.clear();
+      //ROS_INFO("x size=%lu", x.size());
+      
+      ////OR add element by element
+      //x.clear();
+      //double my_number=1.23;
+      //x.push_back(my_number);
+      //ROS_INFO("x size=%lu", x.size());
+      //ROS_INFO("x [0]=%f", x[0]);
+      
+      ////Loop through a vector
+      //for(unsigned int i=0; i<x.size(); i++)
+      //{
+      //  x[i]=x[i]*2.0;
+      //  ROS_INFO("x[%d]=%f",i, x[0]);
+      //}
+      ////EXAMPLES END//
+      
+      
+      
+      //TODO 1 START//
+      //From polar to cartesian: get x,y from laser_msg->ranges, using other laser_msg fields
+      
+      
+      
+      
+      
+      
+      //TODO 1 END//
+      
+      
+
+      ROS_INFO("Cartesian");
+      for(unsigned int i=0; i<indexs.size(); i++)
+        ROS_INFO("for index=%d, x,y=%f,%f",indexs[i], x[indexs[i]],y[indexs[i]]);
+      
+      this->publish_markers(x,y,indexs,"camera_depth_frame","sensor",0.0,red,laser_msg->header.stamp);
+      
+      
+      
+      //TODO 2 START//
+      //From local to global coordinates:
+      //  1st, apply static transform from sensor to platform
+      //    get new x,y using this->static_x/y/th
+      //  2nd, apply dynamic transform from platform to static odom frame, static odom frame
+      //    get new x,y using this->pose_x/y/th
+      
+      
+      
+      
+      
+      
+      //TODO 2 END//
+      
+      
+      
+      ROS_INFO("World");
+      for(unsigned int i=0; i<indexs.size(); i++)
+        ROS_INFO("for index=%d, x,y=%f,%f",indexs[i], x[indexs[i]],y[indexs[i]]);
+      
+      this->publish_markers(x,y,indexs,"odom","world",this->static_z,blue,laser_msg->header.stamp);
+
+      ROS_INFO("---");
+    }
+    
+    void publish_markers(std::vector<double> x, std::vector<double> y, std::vector<int> indexs, std::string frame_id, std::string name_space,double z, std_msgs::ColorRGBA color, ros::Time t)
+    {
+
+      //this->markers_msg.markers.resize(indexs.size());
+      this->markers_msg.markers.clear();
+      for(unsigned int i=0; i<indexs.size(); i++)
+      {
+        visualization_msgs::Marker marker;
+        marker.header.frame_id = frame_id;
+        marker.header.stamp    = t;
+        marker.ns              = name_space;
+        marker.id              = i;
+        //marker.id              = this->markers_msg.markers.size();
+        marker.type            = visualization_msgs::Marker::SPHERE;
+        marker.action          = visualization_msgs::Marker::ADD;
+
+        double radius=0.1;
+        marker.scale.x = radius;
+        marker.scale.y = radius;
+        marker.scale.z = radius;
+
+        marker.pose.position.x = x[indexs[i]];
+        marker.pose.position.y = y[indexs[i]];
+        marker.pose.position.z = z;
+
+        marker.pose.orientation.x = 0.0;
+        marker.pose.orientation.y = 0.0;
+        marker.pose.orientation.z = 0.0;
+        marker.pose.orientation.w = 1.0;
+
+        //marker.color.r = 1.0;
+        //marker.color.g = 0.0;
+        //marker.color.b = 0.0;
+        //marker.color.a = 0.5;
+        marker.color=color;
+        marker.lifetime = ros::Duration(0.0f);
+
+        //only publish if not NaNs
+        if(x[indexs[i]]==x[indexs[i]] && y[indexs[i]] == y[indexs[i]])
+        {
+          this->markers_msg.markers.push_back(marker);
+        }
+      }
+      this->markers_pub.publish(this->markers_msg);
+    }
+    
+    void odom_callback(const nav_msgs::Odometry::ConstPtr& odom_msg)
+    {    
+      this->pose_x = odom_msg->pose.pose.position.x;
+      this->pose_y = odom_msg->pose.pose.position.y;
+      this->pose_th = tf::getYaw(odom_msg->pose.pose.orientation);
+    }
+    
+    void loop()
+    {
+      
+    }
+
+  private:
+    ros::NodeHandle n; 
+    ros::Subscriber laser_sub;
+    ros::Subscriber odom_sub;
+    ros::Publisher markers_pub;
+    visualization_msgs::MarkerArray markers_msg;
+    std_msgs::ColorRGBA red;
+    std_msgs::ColorRGBA green;
+    std_msgs::ColorRGBA blue;
+    double pose_x, pose_y, pose_th;
+    double static_x, static_y, static_z, static_th;
+};
+
+int main(int argc, char **argv)
+{
+  ros::init(argc, argv, "laser_processor");
+  LaserProcessor my_laser_processor;
+  ros::Rate loop_rate(10);
+  while (ros::ok())
+  {
+    my_laser_processor.loop();
+    ros::spinOnce();
+    loop_rate.sleep();
+  }
+  return 0;
+}

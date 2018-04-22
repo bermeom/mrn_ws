@@ -1,0 +1,8 @@
+prefix=/home/upc/mrn_ws/src/upc_mrn/install
+
+Name: catkin_tools_prebuild
+Description: Description of catkin_tools_prebuild
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/upc/mrn_ws/src/upc_mrn/install/lib 
+Requires: 

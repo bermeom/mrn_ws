@@ -1,0 +1,8 @@
+Symlinking /home/upc/mrn_ws/src/upc_mrn/devel/./setup.zsh
+Symlinking /home/upc/mrn_ws/src/upc_mrn/devel/./setup.bash
+Symlinking /home/upc/mrn_ws/src/upc_mrn/devel/./_setup_util.py
+Symlinking /home/upc/mrn_ws/src/upc_mrn/devel/./setup.sh
+Symlinking /home/upc/mrn_ws/src/upc_mrn/devel/./env.sh
+Symlinking /home/upc/mrn_ws/src/upc_mrn/devel/share/catkin_tools_prebuild/cmake/catkin_tools_prebuildConfig.cmake
+Symlinking /home/upc/mrn_ws/src/upc_mrn/devel/share/catkin_tools_prebuild/cmake/catkin_tools_prebuildConfig-version.cmake
+Symlinking /home/upc/mrn_ws/src/upc_mrn/devel/lib/pkgconfig/catkin_tools_prebuild.pc

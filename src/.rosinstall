@@ -1,0 +1,3 @@
+- svn:
+    local-name: upc_mrn
+    uri: https://devel.iri.upc.edu/pub/labrobotica/ros/iri-ros-pkg_hydro/metapackages/iri_teaching/upc_mrn
