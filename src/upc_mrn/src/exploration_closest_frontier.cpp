@@ -133,7 +133,7 @@ geometry_msgs::Pose decideGoal()
   ////////////////////////////////////////////////////////////////////
 
   //EXAMPLE: Choose valid random goal
-  srand((unsigned)time(NULL));
+  /*srand((unsigned)time(NULL));
   do
   {
     g = getRandomPose(3.0);
@@ -141,6 +141,33 @@ geometry_msgs::Pose decideGoal()
     g.position.y += robot_pose_.position.y;
   }
   while(!isValidPoint(g.position));
+  //*/
+  bool isFound = false;
+  double dist,min_dist=-1;
+  for (int i = 0;i<frontiers_.size() ;i++){
+    
+    dist = std::sqrt((frontiers_[i].free_center_point.x-robot_pose_.position.x)*(frontiers_[i].free_center_point.x-robot_pose_.position.x)+
+                     (frontiers_[i].free_center_point.y-robot_pose_.position.y)*(frontiers_[i].free_center_point.y-robot_pose_.position.y));
+    if ((min_dist == -1 || dist < min_dist) && (isValidPoint(frontiers_[i].free_center_point))){
+      g.position.x = frontiers_[i].free_center_point.x;
+      g.position.y = frontiers_[i].free_center_point.y;
+      g.orientation = tf::createQuaternionMsgFromYaw(
+                                  std::atan2(frontiers_[i].center_point.y-g.position.y,
+                                            frontiers_[i].center_point.x-g.position.x)); 
+      min_dist = dist;
+      isFound = true; 
+    }
+  }
+  if (!isFound){
+    ROS_INFO("---> No es valido");
+    do {
+      g = getRandomPose(3.0);
+      g.position.x += robot_pose_.position.x;
+      g.position.y += robot_pose_.position.y;
+    } while(!isValidPoint(g.position));
+  }else{
+     ROS_INFO("==> Es alido");
+  }
   publishMarker(0,g.position.x,g.position.y,4,1,tf::getYaw(g.orientation));
   //EXAMPLE END
   

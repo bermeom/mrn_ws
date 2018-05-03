@@ -49,7 +49,7 @@ ros::Publisher  pub_frontiers_map;
 // list of all frontiers in the occupancy grid
 vector<int> labels_;
 
-typedef struct
+struct frontier
 {
   int id;
   unsigned int size; // frontier size
@@ -59,7 +59,13 @@ typedef struct
   int free_center_cell;
   vector<int> frontier_cells; // points in grid cells
   vector<geometry_msgs::Point> frontier_points; // points in grid coordinates 
-} frontier;
+ 
+ bool operator<(const frontier &f )const {  
+   return this->size > f.size;
+ }
+  
+
+} ;
 vector<frontier> frontiers_;
 
 //////////// Function headers ////////////
@@ -133,14 +139,37 @@ geometry_msgs::Pose decideGoal()
   ////////////////////////////////////////////////////////////////////
 
   //EXAMPLE: Choose valid random goal
+  /*
   srand((unsigned)time(NULL));
-  do
-  {
+  do {
     g = getRandomPose(3.0);
     g.position.x += robot_pose_.position.x;
     g.position.y += robot_pose_.position.y;
+  } while(!isValidPoint(g.position));
+  //*/
+  
+  std::sort(frontiers_.begin(),frontiers_.end());
+  for (int i = 0;i<frontiers_.size() && (!isValidPoint(g.position)||i==0) ;i++){
+    g.position.x = frontiers_[i].free_center_point.x;
+    g.position.y = frontiers_[i].free_center_point.y;
+    g.orientation = tf::createQuaternionMsgFromYaw(
+                                std::atan2(frontiers_[i].center_point.y-g.position.y,
+                                           frontiers_[i].center_point.x-g.position.x)); 
   }
-  while(!isValidPoint(g.position));
+  if (frontiers_.size() == 0 || !isValidPoint(g.position)){
+    ROS_INFO("---> No es valido");
+    do {
+      g = getRandomPose(3.0);
+      g.position.x += robot_pose_.position.x;
+      g.position.y += robot_pose_.position.y;
+    } while(!isValidPoint(g.position));
+  }else{
+     ROS_INFO("==> Es alido");
+  }
+  /*
+  g.orientation = tf::createQuaternionMsgFromYaw(std::fmod(tf::getYaw(robot_pose_.orientation)*1.1,(2*M_PI))); 
+  ROS_INFO("orientation %f vs %f",tf::getYaw(robot_pose_.orientation),tf::getYaw(g.orientation));
+  //*/
   publishMarker(0,g.position.x,g.position.y,4,1,tf::getYaw(g.orientation));
   //EXAMPLE END
   

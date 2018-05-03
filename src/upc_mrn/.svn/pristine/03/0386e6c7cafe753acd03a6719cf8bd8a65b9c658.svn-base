@@ -8,6 +8,7 @@ Panels:
         - /TF1/Frames1
         - /TF1/Tree1
         - /Odometry1/Shape1
+        - /CandidateMarker1/Namespaces1
       Splitter Ratio: 0.643122971
     Tree Height: 429
   - Class: rviz/Selection
@@ -52,179 +53,18 @@ Visualization Manager:
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
-      Enabled: true
+      Enabled: false
       Links:
         All Links Enabled: true
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        base_footprint:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        camera_depth_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        camera_depth_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        camera_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        camera_rgb_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        camera_rgb_optical_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        caster_back_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        caster_front_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        cliff_sensor_front_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        cliff_sensor_left_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        cliff_sensor_right_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        gyro_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        plate_bottom_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        plate_middle_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        plate_top_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_bottom_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_bottom_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_bottom_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_bottom_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_bottom_4_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_bottom_5_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_kinect_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_kinect_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_middle_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_middle_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_middle_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_middle_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_top_0_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_top_1_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_top_2_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        pole_top_3_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheel_left_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        wheel_right_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
       Name: RobotModel
       Robot Description: robot_description
       TF Prefix: ""
       Update Interval: 0
-      Value: true
+      Value: false
       Visual Enabled: true
     - Alpha: 0.699999988
       Class: rviz/Map
@@ -411,6 +251,30 @@ Visualization Manager:
       Topic: /move_base/current_goal
       Unreliable: false
       Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /frontiers_marker
+      Name: FrontiersMarker
+      Namespaces:
+        frontiers: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /candidate_marker
+      Name: CandidateMarker
+      Namespaces:
+        candidates: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /text_marker
+      Name: CandidateTextMarker
+      Namespaces:
+        candidates_text: true
+      Queue Size: 100
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -432,25 +296,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 10
+      Distance: 6.79628563
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
+        X: -0.763762891
+        Y: 0.163716048
+        Z: -0.0241727997
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.785398185
+      Pitch: 1.38539791
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.785398185
+      Yaw: 1.5253979
     Saved: ~
 Window Geometry:
   Displays:
