@@ -145,7 +145,6 @@ geometry_msgs::Pose decideGoal()
   bool isFound = false;
   double dist,min_dist=-1;
   for (int i = 0;i<frontiers_.size() ;i++){
-    
     dist = std::sqrt((frontiers_[i].free_center_point.x-robot_pose_.position.x)*(frontiers_[i].free_center_point.x-robot_pose_.position.x)+
                      (frontiers_[i].free_center_point.y-robot_pose_.position.y)*(frontiers_[i].free_center_point.y-robot_pose_.position.y));
     if ((min_dist == -1 || dist < min_dist) && (isValidPoint(frontiers_[i].free_center_point))){

@@ -164,7 +164,7 @@ geometry_msgs::Pose decideGoal()
       g.position.y += robot_pose_.position.y;
     } while(!isValidPoint(g.position));
   }else{
-     ROS_INFO("==> Es alido");
+     ROS_INFO("==> Es valido");
   }
   /*
   g.orientation = tf::createQuaternionMsgFromYaw(std::fmod(tf::getYaw(robot_pose_.orientation)*1.1,(2*M_PI))); 
