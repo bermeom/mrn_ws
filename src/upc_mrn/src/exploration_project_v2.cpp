@@ -12,6 +12,8 @@
 #include <move_base_msgs/MoveBaseAction.h>
 #include <actionlib/client/simple_action_client.h>
 
+#include "nav_msgs/GetPlan.h"
+
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
 
@@ -19,6 +21,9 @@
 #include <boost/pending/disjoint_sets.hpp>
 #include <numeric>
 #include <algorithm>
+
+
+
 
 using namespace std;
 
@@ -45,12 +50,18 @@ ros::Publisher  pub_cand_mark;
 ros::Publisher  pub_text_mark;
 ros::Publisher  pub_frontiers_mark;
 ros::Publisher  pub_frontiers_map;
+ros::ServiceClient get_plan_client;
+/// ----------------------- My variables
+double max_size;
+double max_dist;
 
 // list of all frontiers in the occupancy grid
 vector<int> labels_;
 
-struct frontier
+ struct frontier
 {
+  public:
+
   int id;
   unsigned int size; // frontier size
   geometry_msgs::Point center_point;  // position of the center cell
@@ -58,14 +69,30 @@ struct frontier
   geometry_msgs::Point free_center_point;  // position of the nearest free cell to the center cell
   int free_center_cell;
   vector<int> frontier_cells; // points in grid cells
-  vector<geometry_msgs::Point> frontier_points; // points in grid coordinates 
- 
- bool operator<(const frontier &f )const {  
-   return this->size > f.size;
- }
+  vector<geometry_msgs::Point> frontier_points; // points in grid coordinates
+  double distance;   // from current position to free_center_point
   
+  inline double getPriority() const{
+    // ROS_INFO("--- :) %d",id);
+    // ROS_INFO("---> distance %f",this->distance);
+    // ROS_INFO("---> size %u",this->size);
+    // ROS_INFO("---> max_size %f",max_size);
+    // ROS_INFO("---> max_dist %f",max_dist);
+    // return (1-(this->distance)/(*this->max_dist))*0.5+((this->size)/(*this->max_size))*0.5;
+    if (this->distance<0){
+      return -1;
+    }
+    return (1-(this->distance)/(max_dist))*0.5+((this->size)/(max_size))*0.5;
+  };
 
-} ;
+  bool operator<(const frontier &f ) const {  
+    return this->getPriority() > f.getPriority();
+  }
+ 
+};
+
+
+
 vector<frontier> frontiers_;
 
 //////////// Function headers ////////////
@@ -79,6 +106,8 @@ bool refreshRobotPosition();
 void clearMarkers();
 geometry_msgs::Pose getRandomPose(float radius);
 bool isValidPoint(const geometry_msgs::Point & point);
+bool isValidGoal(const geometry_msgs::Point & point, double & path_length);
+double get_plan_length(std::vector<geometry_msgs::PoseStamped> poses);
 void finish();
 void publishLabels(const std::vector<int> & v);
 std_msgs::ColorRGBA colorets(int n);
@@ -104,8 +133,7 @@ int floor0(float value);
 //         define them HERE
 //////////////////////////////////////////////////////////////////////
 
-
-
+bool changedFrontiers = false;  
 
 
 //////////////////////////////////////////////////////////////////////
@@ -118,10 +146,25 @@ bool replan()
   ////////////////////////////////////////////////////////////////////
   // TODO 2: replan
   ////////////////////////////////////////////////////////////////////
-  
+
   //EXAMPLE: replan when robot reaches a goal
-  if(robot_status_!=0)
+  // if(robot_status_!=0)
+  //   replan = true;
+  if (changedFrontiers) {
     replan = true;
+    changedFrontiers = false;
+  }
+  switch (robot_status_){
+    case (0): break;
+    case (1):
+              ROS_INFO("It has arrived. Wohoooo");
+              replan = true;
+              break;
+    case (2):
+              ROS_ERROR("It has failed. Ohhh :_(");
+              replan = true;
+              break;
+  }
   //EXAMPLE END
 
   ////////////////////////////////////////////////////////////////////
@@ -134,18 +177,40 @@ geometry_msgs::Pose decideGoal()
 {
   geometry_msgs::Pose g;
   g.orientation.w=1.0; //valid quaternion
+  double length;
   ////////////////////////////////////////////////////////////////////
   // TODO 3: decideGoal
   ////////////////////////////////////////////////////////////////////
-  
+  double dist;
+  ROS_INFO("---> Start");
+  max_dist = -1;
+  max_size = -1;
+  for (int i = 0;i<frontiers_.size();i++){
+    // frontiers_[i].distance = std::sqrt((frontiers_[i].free_center_point.x-robot_pose_.position.x)*(frontiers_[i].free_center_point.x-robot_pose_.position.x)+
+    //                  (frontiers_[i].free_center_point.y-robot_pose_.position.y)*(frontiers_[i].free_center_point.y-robot_pose_.position.y));
+    if (isValidGoal(frontiers_[i].free_center_point,frontiers_[i].distance)){
+      if (i == 0 || max_dist < frontiers_[i].distance){
+        max_dist = frontiers_[i].distance;
+      }
+      if (i == 0 || max_size < frontiers_[i].size){
+        max_size = frontiers_[i].size;
+      }
+    }else{
+      frontiers_[i].distance = -1;
+    }
+    
+  }
+  ROS_INFO("---> Sort %f %f",max_dist,max_size);
   std::sort(frontiers_.begin(),frontiers_.end());
-  for (int i = 0;i<frontiers_.size() && (!isValidPoint(g.position)||i==0) ;i++){
+  ROS_INFO("---> Choose %f %f",max_dist,max_size);
+  int i = 0;
+  // for (i = 0;i<frontiers_.size() && (!isValidPoint(g.position)||i==0) ;i++){
     g.position.x = frontiers_[i].free_center_point.x;
     g.position.y = frontiers_[i].free_center_point.y;
     g.orientation = tf::createQuaternionMsgFromYaw(
                                 std::atan2(frontiers_[i].center_point.y-g.position.y,
                                            frontiers_[i].center_point.x-g.position.x)); 
-  }
+  // }
   if (frontiers_.size() == 0 || !isValidPoint(g.position)){
     ROS_INFO("---> No es valido");
     do {
@@ -157,7 +222,6 @@ geometry_msgs::Pose decideGoal()
      ROS_INFO("==> Es valido");
   }
   publishMarker(0,g.position.x,g.position.y,4,1,tf::getYaw(g.orientation));
-  
   ////////////////////////////////////////////////////////////////////
   // TODO 3 END
   ////////////////////////////////////////////////////////////////////
@@ -213,6 +277,52 @@ bool isValidPoint(const geometry_msgs::Point & point)
   return true;
 }
 
+bool isValidGoal(const geometry_msgs::Point & point, double & path_length)
+{
+  bool valid=false;
+  nav_msgs::GetPlan get_plan_srv;
+  get_plan_srv.request.start.header.stamp = ros::Time::now();
+  get_plan_srv.request.start.header.frame_id = "map";
+  get_plan_srv.request.start.pose = robot_pose_;
+
+  get_plan_srv.request.goal.header.stamp = ros::Time::now();
+  get_plan_srv.request.goal.header.frame_id = "map";
+  get_plan_srv.request.goal.pose.position.x = point.x;
+  get_plan_srv.request.goal.pose.position.y = point.y;
+  get_plan_srv.request.goal.pose.orientation.w = 1.0;
+  if (get_plan_client.call(get_plan_srv))
+  {
+    if(get_plan_srv.response.plan.poses.size()!=0)
+    {
+      path_length = get_plan_length(get_plan_srv.response.plan.poses);
+      ROS_INFO("path length %f", path_length);
+      valid=true;
+    }
+  }
+  else
+    ROS_ERROR("Failed to call service get_plan");
+
+  return valid;
+}
+
+double get_plan_length(std::vector<geometry_msgs::PoseStamped> poses)
+{
+  double length=0.0;
+  if(poses.size()>=1)
+  {
+    for(unsigned int i=1; i<poses.size(); i++)
+    {
+      double x1 = poses[i-1].pose.position.x;
+      double y1 = poses[i-1].pose.position.y;
+      double x2 = poses[i].pose.position.x;
+      double y2 = poses[i].pose.position.y;
+      double d = sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2));
+      length +=d;
+    }
+  }
+  return length;
+}
+
 void spin()
 {
   bool first=true;
@@ -223,6 +333,7 @@ void spin()
   pub_text_mark = n.advertise<visualization_msgs::Marker>("text_marker", 100);
   pub_frontiers_mark = n.advertise<visualization_msgs::Marker>("frontiers_marker", 200);
   pub_frontiers_map = n.advertise<nav_msgs::OccupancyGrid>("frontiers_map", 1);
+  get_plan_client = n.serviceClient<nav_msgs::GetPlan>("/move_base/NavfnROS/make_plan");
   ros::Rate loop_rate(1);
 
   while (ros::ok())
@@ -266,6 +377,7 @@ int main(int argc, char** argv)
 {
   ROS_INFO("Exploration Node");
   ros::init(argc, argv, "exploration");
+ 
   listener_ = new tf::TransformListener();
   ac_ = new actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction>("move_base",true);
   spin();
@@ -326,8 +438,8 @@ bool moveRobot(const geometry_msgs::Pose& goal_pose)
   number_of_goals_sent++;
   ROS_INFO("moveRobot: Sending Goal #%d: x=%4.2f, y=%4.2f, yaw=%4.2f in frame=%s",
            number_of_goals_sent,
-           goal.target_pose.pose.position.x, 
-           goal.target_pose.pose.position.y, 
+           goal.target_pose.pose.position.x,
+           goal.target_pose.pose.position.y,
            tf::getYaw(goal.target_pose.pose.orientation) ,
            goal.target_pose.header.frame_id.c_str());
 
@@ -335,17 +447,18 @@ bool moveRobot(const geometry_msgs::Pose& goal_pose)
   int elapsed_time_minutes = int(t.toSec())/60;
   int elapsed_time_seconds = int(t.toSec())%60;
   ROS_INFO("Exploration status: Sent %d goals (reached %d). Wheel travelled %.2f meters. Elapsed %2.2i:%2.2i min. Explored %.2f m^2 (%d cells)",
-           number_of_goals_sent, 
-           number_of_goals_reached, 
+           number_of_goals_sent,
+           number_of_goals_reached,
            wheel_travelled_distance,
            elapsed_time_minutes, elapsed_time_seconds,
-           explored_cells*map_.info.resolution*map_.info.resolution, 
+           explored_cells*map_.info.resolution*map_.info.resolution,
            explored_cells);
 
   ac_->sendGoal(goal,
             boost::bind(&move_baseDone, _1, _2),
             boost::bind(&move_baseActive));
   robot_status_=0; //moving
+  ROS_INFO("MOVING -------------------- <<<<"); 
   return true;
 }
 
@@ -545,6 +658,9 @@ std_msgs::ColorRGBA colorets(int n)
 // FRONTIER MANAGING FUNCITONS /////////////////////////////////////////////////
 void findFrontiers()
 {
+  ///////////// Edited by us. Hi! ////////
+  changedFrontiers = true;
+  //////////////////////
   frontier_map_.data.resize(num_map_cells_);
   frontier_map_.data.assign(frontier_map_.data.size(), 0);
   clearMarkers();
