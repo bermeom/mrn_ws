@@ -80,9 +80,9 @@ vector<int> labels_;
     // ROS_INFO("---> max_dist %f",max_dist);
     // return (1-(this->distance)/(*this->max_dist))*0.5+((this->size)/(*this->max_size))*0.5;
     if (this->distance<0){
-        return this->distance*(1-(this->size)/(max_size))*0.5;
+      return -1;
     }
-    return (1-(this->distance)/(max_dist))*0.7+((this->size)/(max_size))*0.5;
+    return (1-(this->distance)/(max_dist))*0.5+((this->size)/(max_size))*0.5;
   };
 
   bool operator<(const frontier &f ) const {  
@@ -104,7 +104,6 @@ void publishMarker(uint i, const float & x, const float & y,int color,int type,c
 void occupancy_gridCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
 bool refreshRobotPosition();
 void clearMarkers();
-geometry_msgs::Pose getRandomPose(float radius,geometry_msgs::Quaternion &orientation);
 geometry_msgs::Pose getRandomPose(float radius);
 bool isValidPoint(const geometry_msgs::Point & point);
 bool isValidGoal(const geometry_msgs::Point & point, double & path_length);
@@ -135,7 +134,7 @@ int floor0(float value);
 //////////////////////////////////////////////////////////////////////
 
 bool changedFrontiers = false;  
-bool didItHaveError = false;
+
 
 //////////////////////////////////////////////////////////////////////
 // TODO 1 END
@@ -147,23 +146,23 @@ bool replan()
   ////////////////////////////////////////////////////////////////////
   // TODO 2: replan
   ////////////////////////////////////////////////////////////////////
-  didItHaveError = false;
 
   //EXAMPLE: replan when robot reaches a goal
   // if(robot_status_!=0)
   //   replan = true;
+  bool sw = false;
   if (changedFrontiers) {
-    ROS_INFO("Frontiers have changed. Land ahead!");
+    ROS_INFO("Frontiers have changed. Land ahead!, x=%f y=%f",target_goal_.position.x ,target_goal_.position.y );
     replan = true;
     changedFrontiers = false;
-    for (int i = 0;i<frontiers_.size();i++){
-        if (frontiers_[i].free_center_point.x == target_goal_.position.x &&
-            frontiers_[i].free_center_point.y == target_goal_.position.y){
-              replan = false; 
-              break; 
-            } 
-    }
-
+    // for (int i = 0;i<frontiers_.size();i++){
+    //     if (abs(frontiers_[i].free_center_point.x-target_goal_.position.x) <= 0.01&&
+    //         abs(frontiers_[i].free_center_point.y-target_goal_.position.y) <= 0.01){
+    //           replan = false; 
+    //           sw = true;
+    //           break; 
+    //         } 
+    // }
   }
   switch (robot_status_){
     case (0): break;
@@ -173,8 +172,8 @@ bool replan()
               break;
     case (2):
               ROS_ERROR("It has failed. Ohhh :_(");
+              // replan = sw?replan:true;
               replan = true;
-              didItHaveError = true;
               break;
   }
   //EXAMPLE END
@@ -197,16 +196,10 @@ geometry_msgs::Pose decideGoal()
   ROS_INFO("---> Start");
   max_dist = -1;
   max_size = -1;
-  
   for (int i = 0;i<frontiers_.size();i++){
     // frontiers_[i].distance = std::sqrt((frontiers_[i].free_center_point.x-robot_pose_.position.x)*(frontiers_[i].free_center_point.x-robot_pose_.position.x)+
     //                  (frontiers_[i].free_center_point.y-robot_pose_.position.y)*(frontiers_[i].free_center_point.y-robot_pose_.position.y));
-    if (didItHaveError && frontiers_[i].free_center_point.x == target_goal_.position.x &&
-                frontiers_[i].free_center_point.y == target_goal_.position.y){
-        frontiers_[i].distance = -100;            
-        ROS_INFO("===> is same target %d %d",i,frontiers_[i].id);
-
-    }else if (isValidGoal(frontiers_[i].free_center_point,frontiers_[i].distance)){
+    if (isValidGoal(frontiers_[i].free_center_point,frontiers_[i].distance)){
       if (i == 0 || max_dist < frontiers_[i].distance){
         max_dist = frontiers_[i].distance;
       }
@@ -215,59 +208,20 @@ geometry_msgs::Pose decideGoal()
       }
     }else{
       frontiers_[i].distance = -1;
-      ROS_INFO("---> is not valid %d %d",i,frontiers_[i].id);
-  
     }
     
   }
   ROS_INFO("---> Sort %f %f",max_dist,max_size);
   std::sort(frontiers_.begin(),frontiers_.end());
-  ROS_INFO("---> Choose %f %f %d",max_dist,max_size,(int)frontiers_.size());
+  ROS_INFO("---> Choose %f %f",max_dist,max_size);
   int i = 0;
-  if (frontiers_.size()>0){
-      double eps = 0.5;
-      for (i = 0;i<frontiers_.size();i++){  
-
-        if (didItHaveError && abs(frontiers_[i].free_center_point.x - target_goal_.position.x) < eps 
-            && abs(frontiers_[i].free_center_point.y - target_goal_.position.y) < eps){
-          continue;
-        }
-        g.position.x = frontiers_[i].free_center_point.x;
-        g.position.y = frontiers_[i].free_center_point.y;
-        g.orientation = tf::createQuaternionMsgFromYaw(
-                                    std::atan2(frontiers_[i].center_point.y-g.position.y,
-                                              frontiers_[i].center_point.x-g.position.x)); 
-        ROS_INFO("---> Condition %d , %d ,%f",(int)(
-                    abs(frontiers_[i].free_center_point.x - target_goal_.position.x) < eps
-                    && abs(frontiers_[i].free_center_point.y - target_goal_.position.y) < eps
-                    ),i,frontiers_[i].getPriority());
-        break;
-      }
-      
-      ROS_INFO("---> Condition END %d , %d ,%f",(int)(
-                    abs(frontiers_[i].free_center_point.x - target_goal_.position.x) < eps
-                    && abs(frontiers_[i].free_center_point.y - target_goal_.position.y) < eps
-                    ),i,frontiers_[i].getPriority());
-     
-      if (i<frontiers_.size() && (
-          (  abs(frontiers_[i].free_center_point.x - target_goal_.position.x) < eps 
-                && abs(frontiers_[i].free_center_point.y - target_goal_.position.y) < eps
-                )
-          || !isValidPoint(g.position))
-            ){
-        ROS_INFO("---> Target is same %1f %d ",frontiers_[i].getPriority(),i);
-        for(int k=0;k<100 && (
-                ( g.position.x == target_goal_.position.x 
-                    && g.position.y == target_goal_.position.y )
-                  || !isValidPoint(g.position)
-                );k++) {
-          g = getRandomPose(eps-1e-3,g.orientation);
-          g.position.x += frontiers_[i].free_center_point.x;
-          g.position.y += frontiers_[i].free_center_point.y;
-        }
-      }
-  } 
-
+  // for (i = 0;i<frontiers_.size() && (!isValidPoint(g.position)||i==0) ;i++){
+    g.position.x = frontiers_[i].free_center_point.x;
+    g.position.y = frontiers_[i].free_center_point.y;
+    g.orientation = tf::createQuaternionMsgFromYaw(
+                                std::atan2(frontiers_[i].center_point.y-g.position.y,
+                                           frontiers_[i].center_point.x-g.position.x)); 
+  // }
   if (frontiers_.size() == 0 || !isValidPoint(g.position)){
     ROS_INFO("---> No es valido");
     do {
@@ -278,8 +232,6 @@ geometry_msgs::Pose decideGoal()
   }else{
      ROS_INFO("==> Es valido");
   }
-  didItHaveError = false;
-  
   publishMarker(0,g.position.x,g.position.y,4,1,tf::getYaw(g.orientation));
   ////////////////////////////////////////////////////////////////////
   // TODO 3 END
@@ -308,29 +260,6 @@ geometry_msgs::Pose getRandomPose(float radius)
   goal_pose.position.x = rand_r * cos(rand_yaw);
   goal_pose.position.y = rand_r * sin(rand_yaw);
   goal_pose.orientation = tf::createQuaternionMsgFromYaw(rand_yaw);
-  
-  return goal_pose;
-}
-
-
-geometry_msgs::Pose getRandomPose(float radius,geometry_msgs::Quaternion &orientation)
-{
-  geometry_msgs::Pose goal_pose;
-
-  if (radius <= 0)
-  {
-      ROS_WARN("getRandomPose: radius must be > 0. Changed to 1");
-      radius = 1;
-  }
-
-  // gives a pose between +-radius limits. If you add it to robot_pose_ coordinates, you have a random pose around the robot
-  float rand_yaw = 2*M_PI * (rand()%100)/100.0;
-  float rand_r = radius*(rand()%100)/100.0;
-
-  goal_pose.position.x = rand_r * cos(rand_yaw);
-  goal_pose.position.y = rand_r * sin(rand_yaw);
-  // goal_pose.orientation = tf::createQuaternionMsgFromYaw(rand_yaw);
-  goal_pose.orientation = orientation;
 
   return goal_pose;
 }

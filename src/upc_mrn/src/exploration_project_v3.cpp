@@ -82,7 +82,7 @@ vector<int> labels_;
     if (this->distance<0){
         return this->distance*(1-(this->size)/(max_size))*0.5;
     }
-    return (1-(this->distance)/(max_dist))*0.7+((this->size)/(max_size))*0.5;
+    return (1-(this->distance)/(max_dist))*0.5+((this->size)/(max_size))*0.5;
   };
 
   bool operator<(const frontier &f ) const {  
@@ -152,6 +152,7 @@ bool replan()
   //EXAMPLE: replan when robot reaches a goal
   // if(robot_status_!=0)
   //   replan = true;
+  bool sw = false;
   if (changedFrontiers) {
     ROS_INFO("Frontiers have changed. Land ahead!");
     replan = true;
@@ -160,6 +161,7 @@ bool replan()
         if (frontiers_[i].free_center_point.x == target_goal_.position.x &&
             frontiers_[i].free_center_point.y == target_goal_.position.y){
               replan = false; 
+              sw = true;
               break; 
             } 
     }
@@ -173,7 +175,8 @@ bool replan()
               break;
     case (2):
               ROS_ERROR("It has failed. Ohhh :_(");
-              replan = true;
+              replan = sw?replan:true;
+              // replan = true;
               didItHaveError = true;
               break;
   }
@@ -201,11 +204,9 @@ geometry_msgs::Pose decideGoal()
   for (int i = 0;i<frontiers_.size();i++){
     // frontiers_[i].distance = std::sqrt((frontiers_[i].free_center_point.x-robot_pose_.position.x)*(frontiers_[i].free_center_point.x-robot_pose_.position.x)+
     //                  (frontiers_[i].free_center_point.y-robot_pose_.position.y)*(frontiers_[i].free_center_point.y-robot_pose_.position.y));
-    if (didItHaveError && frontiers_[i].free_center_point.x == target_goal_.position.x &&
+    if (frontiers_[i].free_center_point.x == target_goal_.position.x &&
                 frontiers_[i].free_center_point.y == target_goal_.position.y){
-        frontiers_[i].distance = -100;            
-        ROS_INFO("===> is same target %d %d",i,frontiers_[i].id);
-
+        frontiers_[i].distance = -10;            
     }else if (isValidGoal(frontiers_[i].free_center_point,frontiers_[i].distance)){
       if (i == 0 || max_dist < frontiers_[i].distance){
         max_dist = frontiers_[i].distance;
@@ -215,60 +216,35 @@ geometry_msgs::Pose decideGoal()
       }
     }else{
       frontiers_[i].distance = -1;
-      ROS_INFO("---> is not valid %d %d",i,frontiers_[i].id);
-  
     }
     
   }
   ROS_INFO("---> Sort %f %f",max_dist,max_size);
   std::sort(frontiers_.begin(),frontiers_.end());
-  ROS_INFO("---> Choose %f %f %d",max_dist,max_size,(int)frontiers_.size());
+  ROS_INFO("---> Choose %f %f",max_dist,max_size);
   int i = 0;
-  if (frontiers_.size()>0){
-      double eps = 0.5;
-      for (i = 0;i<frontiers_.size();i++){  
+  // for (i = 0;i<frontiers_.size() && 
+  //               (
+  //               frontiers_[i].free_center_point.x != target_goal_.position.x &&
+  //               frontiers_[i].free_center_point.y != target_goal_.position.y
+  //               ) ;i++){  
+    g.position.x = frontiers_[i].free_center_point.x;
+    g.position.y = frontiers_[i].free_center_point.y;
+    g.orientation = tf::createQuaternionMsgFromYaw(
+                                std::atan2(frontiers_[i].center_point.y-g.position.y,
+                                           frontiers_[i].center_point.x-g.position.x)); 
+  // }
 
-        if (didItHaveError && abs(frontiers_[i].free_center_point.x - target_goal_.position.x) < eps 
-            && abs(frontiers_[i].free_center_point.y - target_goal_.position.y) < eps){
-          continue;
-        }
-        g.position.x = frontiers_[i].free_center_point.x;
-        g.position.y = frontiers_[i].free_center_point.y;
-        g.orientation = tf::createQuaternionMsgFromYaw(
-                                    std::atan2(frontiers_[i].center_point.y-g.position.y,
-                                              frontiers_[i].center_point.x-g.position.x)); 
-        ROS_INFO("---> Condition %d , %d ,%f",(int)(
-                    abs(frontiers_[i].free_center_point.x - target_goal_.position.x) < eps
-                    && abs(frontiers_[i].free_center_point.y - target_goal_.position.y) < eps
-                    ),i,frontiers_[i].getPriority());
-        break;
-      }
-      
-      ROS_INFO("---> Condition END %d , %d ,%f",(int)(
-                    abs(frontiers_[i].free_center_point.x - target_goal_.position.x) < eps
-                    && abs(frontiers_[i].free_center_point.y - target_goal_.position.y) < eps
-                    ),i,frontiers_[i].getPriority());
-     
-      if (i<frontiers_.size() && (
-          (  abs(frontiers_[i].free_center_point.x - target_goal_.position.x) < eps 
-                && abs(frontiers_[i].free_center_point.y - target_goal_.position.y) < eps
-                )
-          || !isValidPoint(g.position))
-            ){
-        ROS_INFO("---> Target is same %1f %d ",frontiers_[i].getPriority(),i);
-        for(int k=0;k<100 && (
-                ( g.position.x == target_goal_.position.x 
-                    && g.position.y == target_goal_.position.y )
-                  || !isValidPoint(g.position)
-                );k++) {
-          g = getRandomPose(eps-1e-3,g.orientation);
-          g.position.x += frontiers_[i].free_center_point.x;
-          g.position.y += frontiers_[i].free_center_point.y;
-        }
-      }
-  } 
+  if (i<frontiers_.size()){
+    for(int k=0;k<100 && !isValidPoint(g.position) ;k++) {
+      g = getRandomPose(3.0,g.orientation);
+      g.position.x += frontiers_[i].free_center_point.x;
+      g.position.y += frontiers_[i].free_center_point.y;
+    }
+  }
+   
 
-  if (frontiers_.size() == 0 || !isValidPoint(g.position)){
+  if (frontiers_.size() == 0 || i >= frontiers_.size() || !isValidPoint(g.position)){
     ROS_INFO("---> No es valido");
     do {
       g = getRandomPose(3.0);
